@@ -1,0 +1,84 @@
+# @package _global_
+
+datamodule:
+  _target_: datasets.DocREDataModule
+  _partial_: true
+  dataset_dir: ./data/Re-DocRED
+  train_file: train_revised.json
+  train_distant_file: train_distant.json
+  dev_file: dev_revised.json
+  test_file: test_revised.json
+  force_regeneration: false
+  use_coref: true                     
+  train_batch_size: 4
+  test_batch_size: 4
+
+model:
+  _target_: model.DocREModel
+  _partial_: true
+    #model_name_or_path: ./PLM/deberta-v3-large
+  model_name_or_path: ./PLM/roberta-large
+  max_seq_length: 1024
+  transformer_type: roberta
+  graph_conv:
+#    _target_: model.NoGraphConv      
+    _target_: model.GATGraphConv
+    _partial_: true
+    # hidden_dim: leave for runtime decision
+    edge_types: ['d-s', 's-s', 's-m', 'ie/m-m', 'is/m-m']
+    feat_drop: 0.25
+    attn_drop: 0.1
+    residual: false
+    activation:
+      _target_: torch.nn.Tanh
+    num_layers: 2
+  residual: true
+  coref: gated  # gated or e_context
+  num_class: 97
+  block_size: 64
+  kg_conv:
+#    _target_: model.NoKGEmbeddingLayer  
+    _target_: model.KGEmbeddingLayer
+    _partial_: true
+    # hidden_dim: leave for runtime decision
+    num_rels: 96
+    num_bases: 48
+    dropout: 0.1
+    score_func:
+      _target_: model.DistMultScore
+    activation:
+      _target_: torch.nn.Tanh
+  axial_conv:
+#    _target_: model.NoAxialTransformer  
+    _target_: model.AxialTransformer_by_entity
+    # emb_size: leave for runtime decision
+    _partial_: true
+    dropout: 0.0
+    num_layers: 6
+    heads: 8
+  kg_loss_weight: 0.8
+  loss_fnt:
+    _target_: losses.AFLoss
+    gamma_pos: 1.0
+    gamma_neg: 1.0
+    num_labels: -1
+
+train:
+  seed: 66
+  epochs: 30
+  log_steps: 100                         
+  device: "cuda:1"
+  start_steps: -1
+  evaluation_steps: -1                   
+  gradient_accumulation_steps: 1
+  learning_rate: 3e-5
+  classifier_lr: 1e-4
+  lr_schedule: linear # linear or cosine
+  warmup_ratio: 0.2
+  adam_epsilon: 1e-6
+  max_grad_norm: 1.0
+  save_best_path: models/re-docred/2
+  save_last_path: null
+
+load_path: null
+load_checkpoint: null
